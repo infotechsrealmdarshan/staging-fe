@@ -3,7 +3,7 @@
   "version": "1.3.6",
   "description": "Pannellum React Component",
   "scripts": {
-    "prebuild": "npm install",
+    "prebuild": "npm install --legacy-peer-deps",
     "build": "react-scripts build",
     "clean": "rimraf build",
     "start": "react-scripts start",

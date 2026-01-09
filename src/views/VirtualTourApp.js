@@ -3668,6 +3668,8 @@ class VirtualTourApp extends Component {
                         onMousedown={this.handleViewerState}
                         onMouseup={this.handleViewerState}
                         onTouchend={this.handleViewerState}
+                        onLoad={() => console.log('Panorama loaded successfully:', activeScene?.image)}
+                        onError={(error) => console.error('Panorama loading error:', error, 'Image URL:', activeScene?.image)}
                         minPitch={-60}
                         maxPitch={60}
                     >
@@ -3813,10 +3815,6 @@ class VirtualTourApp extends Component {
                                     ))}
                                 </div>
 
-                                <button className="add-area-button" onClick={this.openAddAreaDialog}>
-                                    <span>+</span>
-                                    <span>Add Area</span>
-                                </button>
                                 <button className="close-slider-button" onClick={this.closeSelectAreaSlider}>×</button>
                             </div>
                         </div>

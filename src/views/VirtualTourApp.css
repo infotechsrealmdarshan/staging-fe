@@ -197,6 +197,7 @@
     border: none;
     box-shadow: none;
     gap: 12px;
+    max-width: calc(100vw - 40%);
 }
 
 .add-items-button {
@@ -244,7 +245,7 @@
     gap: 12px;
     align-items: center;
     overflow-x: auto;
-    max-width: calc(100vw - 350px);
+    max-width: calc(100vw - 250px);
     padding: 0;
     scrollbar-width: none;
 }
@@ -368,6 +369,27 @@
     z-index: 50;
     display: flex;
     gap: 15px;
+    max-width: calc(100vw - 140px);
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.control-icons::-webkit-scrollbar {
+    height: 4px;
+}
+
+.control-icons::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.control-icons::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+}
+
+.control-icons::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .control-icon {
@@ -384,7 +406,6 @@
     align-items: center;
     justify-content: center;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .control-icon:hover {
@@ -465,6 +486,7 @@
 .location-dialog {
     width: 90%;
     max-width: 480px;
+    max-height: 90vh;
     background-color: rgba(10, 10, 10, 0.7);
     backdrop-filter: blur(50px);
     -webkit-backdrop-filter: blur(50px);
@@ -472,6 +494,26 @@
     padding: 35px;
     box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.location-dialog::-webkit-scrollbar {
+    width: 6px;
+}
+
+.location-dialog::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.location-dialog::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+}
+
+.location-dialog::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .dialog-title {
@@ -918,6 +960,7 @@
         bottom: 25px;
         right: 25px;
         gap: 12px;
+        max-width: calc(100vw - 120px);
     }
 
     .control-icon {
@@ -926,8 +969,66 @@
     }
 
     .control-icon img {
-        width: 18px !important;
-        height: 18px !important;
+        width: 18px;
+        height: 18px;
+    }
+}
+
+@media (max-width: 500px) {
+    .app-header {
+        padding: 10px 10px 0 10px;
+        align-items: start;
+    }
+
+    .item-library-gallery {
+        gap: 5px !important;
+    }
+
+    .add-items-container {
+        left: 10px !important;
+        gap: 5px !important;
+        max-width: calc(100vw - 90px);
+    }
+
+    .item-library-gallery {
+        max-width: calc(100vw - 120px);
+    }
+
+    .control-icons {
+        flex-direction: column;
+        gap: 10px;
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        bottom: 20px;
+        right: 10px;
+        max-width: none;
+        width: auto;
+    }
+
+    .control-icons::-webkit-scrollbar {
+        width: 4px;
+        height: auto;
+    }
+
+    .control-icons::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .control-icons::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 10px;
+    }
+
+    .control-icon {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+    }
+
+    .control-icon img {
+        width: 16px !important;
+        height: 16px !important;
     }
 }
 
@@ -946,6 +1047,10 @@
     .png-overlay-item {
         width: 65px;
         height: 65px;
+    }
+
+    .item-library-gallery {
+        max-width: calc(100vw - 200px);
     }
 
     .control-icons {
@@ -1692,6 +1797,51 @@
 
     .item-library-gallery {
         max-width: calc(100vw - 120px);
+    }
+}
+
+/* Extra Small Mobile Devices - Under 425px */
+@media (max-width: 425px) {
+
+    .add-items-button,
+    .library-item {
+        width: 50px;
+        height: 50px;
+        border-radius: 5px;
+    }
+
+    .add-items-button .icon {
+        font-size: 18px;
+    }
+
+    .add-items-button .label {
+        font-size: 8px;
+    }
+
+    .item-library-gallery {
+        max-width: calc(100vw - 100px);
         gap: 8px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        /* Firefox */
+        -ms-overflow-style: none;
+        /* IE and Edge */
+    }
+
+    .item-library-gallery::-webkit-scrollbar {
+        display: none;
+        /* Chrome, Safari, Opera */
+    }
+
+    .library-item img {
+        width: 90%;
+        height: 90%;
+    }
+
+    .delete-item-lib-btn,
+    .add-overlay {
+        width: 16px;
+        height: 16px;
+        font-size: 10px;
     }
 }

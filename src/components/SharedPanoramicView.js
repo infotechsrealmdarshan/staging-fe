@@ -1,6 +1,8 @@
 import React, { Component } from 'react';
 import Pannellum from '../elements/Pannellum';
 import { authService } from '../services/auth';
+import { stragingService } from '../services/straging';
+import VirtualTourApp from '../views/VirtualTourApp';
 
 const API_BASE = process.env.REACT_APP_BASE_URL + '/api';
 
@@ -76,13 +78,14 @@ class SharedPanoramicView extends Component {
     }
 
     loadByShareId = async (shareId) => {
-        // This would typically call your API to get shared data
-        // For now, we'll simulate with a mock response
-        const response = await fetch(`${API_BASE}/share/${shareId}`);
-        if (!response.ok) {
-            throw new Error('Share not found');
+        try {
+            const response = await stragingService.getPublicStragingById(shareId);
+            // If response has data property, return that, otherwise return response directly
+            return response.data || response;
+        } catch (error) {
+            console.error("Error fetching shared straging:", error);
+            throw new Error('Share not found or invalid');
         }
-        return await response.json();
     }
 
     loadByFileId = async (fileId) => {
@@ -185,89 +188,11 @@ class SharedPanoramicView extends Component {
         }
 
         return (
-            <div style={{ height: '100vh', width: '100vw', position: 'relative' }}>
-                {/* Header with info */}
-                <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    left: '20px',
-                    right: '20px',
-                    zIndex: 1000,
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    padding: '12px 20px',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                }}>
-                    <div>
-                        <h3 style={{ margin: 0, color: '#1f2937', fontSize: '18px' }}>
-                            {panoramicData?.title || 'Panoramic 360° View'}
-                        </h3>
-                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
-                            {isAuthenticated ? 'Authenticated User' : 'Public View'}
-                        </p>
-                    </div>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        {!isAuthenticated && (
-                            <button
-                                onClick={this.handleBackToLogin}
-                                style={{
-                                    background: '#667eea',
-                                    color: 'white',
-                                    border: 'none',
-                                    padding: '8px 16px',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px'
-                                }}
-                            >
-                                Login
-                            </button>
-                        )}
-                        <button
-                            onClick={() => window.close()}
-                            style={{
-                                background: '#dc3545',
-                                color: 'white',
-                                border: 'none',
-                                padding: '8px 16px',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontSize: '14px'
-                            }}
-                        >
-                            Close
-                        </button>
-                    </div>
-                </div>
-
-                {/* Pannellum Viewer */}
-                <div style={{ height: '100%', width: '100%' }}>
-                    <Pannellum
-                        id="shared-panoramic-view"
-                        width="100%"
-                        height="100%"
-                        image={panoramicData?.panorama || ''}
-                        title={panoramicData?.title || ''}
-                        haov={panoramicData?.haov || 360}
-                        vaov={panoramicData?.vaov || 180}
-                        autoLoad={true}
-                        showControls={true}
-                        showFullscreenCtrl={true}
-                        showZoomCtrl={true}
-                        autoRotate={panoramicData?.autoRotate || 0}
-                        yaw={panoramicData?.yaw || 0}
-                        pitch={panoramicData?.pitch || 0}
-                        hfov={panoramicData?.hfov || 100}
-                        minHfov={panoramicData?.minHfov || 50}
-                        maxHfov={panoramicData?.maxHfov || 150}
-                        onLoad={() => console.log('Panoramic view loaded successfully')}
-                        onError={(error) => console.error('Panoramic view error:', error)}
-                    />
-                </div>
-            </div>
+            <VirtualTourApp
+                projectData={panoramicData}
+                isViewMode={true}
+                user={null}
+            />
         );
     }
 }

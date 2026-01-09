@@ -123,8 +123,16 @@ class VirtualTourApp extends Component {
             });
         }
 
-        // 🔹 Handle Backend "areas" structure - Create scenes for areas that don't exist
+        // 🔹 Handle Backend "areas" structure - Populate scenes with items, hotspots, and info
         if (props.projectData?.areas && props.projectData.areas.length > 0) {
+            // Create areaId to _id mapping for hotspot navigation
+            const areaIdMap = {};
+            props.projectData.areas.forEach(area => {
+                if (area.areaId && area._id) {
+                    areaIdMap[area.areaId] = area._id;
+                }
+            });
+
             props.projectData.areas.forEach((area, index) => {
                 const areaId = area.id || area._id || `area_${index}`;
 
@@ -145,6 +153,79 @@ class VirtualTourApp extends Component {
                         id: areaId,
                         name: area.areaName || area.name || `Area ${index + 1}`,
                         areaName: area.areaName || area.name || `Area ${index + 1}`
+                    });
+                }
+
+                const currentScene = initialScenes[areaId];
+
+                // 1. Map Items (PNG Overlays)
+                if (area.items && Array.isArray(area.items)) {
+                    area.items.forEach(item => {
+                        const pitch = 90 - (item.y / 100) * 180;
+                        const yaw = (item.x / 100) * 360 - 180;
+
+                        // Check if item already exists to avoid duplicates
+                        if (!currentScene.pngOverlays.find(p => p.id === (item.instanceId || item._id))) {
+                            currentScene.pngOverlays.push({
+                                id: item.instanceId || item._id,
+                                image: item.imageUrl,
+                                pitch: pitch,
+                                yaw: yaw,
+                                width: item.width || 200,
+                                height: item.height || 200,
+                                rotation: item.rotation || 0,
+                                scale: 1,
+                                flipX: item.flipX || false,
+                                flipY: item.flipY || false,
+                                mongoId: item.instanceId || item._id
+                            });
+                        }
+                    });
+                }
+
+                // 2. Map Navigation Hotspots
+                if (area.hotspots && Array.isArray(area.hotspots)) {
+                    area.hotspots.forEach(hs => {
+                        const pitch = 90 - (hs.y / 100) * 180;
+                        const yaw = (hs.x / 100) * 360 - 180;
+
+                        // Resolve childAreaId to MongoDB _id using areaIdMap
+                        let targetSceneId = hs.childAreaId || hs.targetSceneId;
+                        if (targetSceneId && areaIdMap[targetSceneId]) {
+                            targetSceneId = areaIdMap[targetSceneId];
+                        }
+
+                        if (!currentScene.hotspots.find(h => h.id === (hs.hotspotId || hs._id))) {
+                            currentScene.hotspots.push({
+                                id: hs.hotspotId || hs._id,
+                                pitch: pitch,
+                                yaw: yaw,
+                                type: 'navigation',
+                                title: hs.title || 'Hotspot',
+                                image: hs.imageUrl, // Destination image
+                                targetScene: targetSceneId,
+                                areaId: hs.childAreaId // Helper for navigation
+                            });
+                        }
+                    });
+                }
+
+                // 3. Map Info Hotspots
+                if (area.info && Array.isArray(area.info)) {
+                    area.info.forEach(inf => {
+                        const pitch = 90 - (inf.y / 100) * 180;
+                        const yaw = (inf.x / 100) * 360 - 180;
+
+                        if (!currentScene.hotspots.find(h => h.id === (inf._id || inf.id))) {
+                            currentScene.hotspots.push({
+                                id: inf._id || inf.id,
+                                pitch: pitch,
+                                yaw: yaw,
+                                type: 'info',
+                                title: 'Info',
+                                description: inf.description
+                            });
+                        }
                     });
                 }
             });
@@ -307,7 +388,7 @@ class VirtualTourApp extends Component {
             },
             mouseDownTime: null,
             mouseDownPosition: null,
-            isViewMode: false, // Flag for view-only mode
+            isViewMode: props.isViewMode || false, // Flag for view-only mode
             currentTourId: null, // Store current tour ID for updates
 
             // Project Info State
@@ -827,47 +908,70 @@ class VirtualTourApp extends Component {
             return;
         }
 
+        // Check if speech synthesis is available
+        if (!this.speechSynthesis) {
+            console.warn('Speech synthesis not available in this browser');
+            return;
+        }
+
         // Stop any current speech
         this.stopSpeaking();
 
-        if (typeof text !== 'string' || !text.trim()) return;
-
-        // Create speech utterance
-        const utterance = new SpeechSynthesisUtterance(text.trim());
-
-        // Set voice properties for better quality
-        utterance.rate = 0.95; // Slightly slower for better comprehension
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
-
-        // Try to use a good voice (prefer English voices)
-        const voices = this.speechSynthesis.getVoices();
-        const preferredVoice = voices.find(voice =>
-            voice.lang.includes('en') && voice.localService
-        ) || voices.find(voice => voice.lang.includes('en')) || voices[0];
-
-        if (preferredVoice) {
-            utterance.voice = preferredVoice;
+        if (typeof text !== 'string' || !text.trim()) {
+            console.warn('Invalid text for speech synthesis:', text);
+            return;
         }
 
-        // Handle speech events
-        utterance.onend = () => {
-            if (this.state.speakingHotspotId === hotspotId) {
-                this.setState({ speakingHotspotId: null });
+        try {
+            // Get voices - they might not be loaded yet
+            const voices = this.speechSynthesis.getVoices();
+
+            // If no voices available, try again after a short delay
+            if (voices.length === 0) {
+                console.warn('No voices available yet, speech synthesis skipped');
+                return;
             }
-            this.currentUtterance = null;
-        };
 
-        utterance.onerror = (event) => {
-            console.error('Speech synthesis error:', event);
+            // Create speech utterance
+            const utterance = new SpeechSynthesisUtterance(text.trim());
+
+            // Set voice properties for better quality
+            utterance.rate = 0.95; // Slightly slower for better comprehension
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+
+            // Try to use a good voice (prefer English voices)
+            const preferredVoice = voices.find(voice =>
+                voice.lang.includes('en') && voice.localService
+            ) || voices.find(voice => voice.lang.includes('en')) || voices[0];
+
+            if (preferredVoice) {
+                utterance.voice = preferredVoice;
+            }
+
+            // Handle speech events
+            utterance.onend = () => {
+                if (this.state.speakingHotspotId === hotspotId) {
+                    this.setState({ speakingHotspotId: null });
+                }
+                this.currentUtterance = null;
+            };
+
+            utterance.onerror = (event) => {
+                // Silently handle errors - TTS is a nice-to-have feature
+                console.warn('Speech synthesis error (non-critical):', event.error);
+                this.setState({ speakingHotspotId: null });
+                this.currentUtterance = null;
+            };
+
+            // Store reference and start speaking
+            this.currentUtterance = utterance;
+            this.setState({ speakingHotspotId: hotspotId });
+            this.speechSynthesis.speak(utterance);
+        } catch (error) {
+            console.warn('Error initializing speech synthesis:', error);
             this.setState({ speakingHotspotId: null });
-            this.currentUtterance = null;
-        };
-
-        // Store reference and start speaking
-        this.currentUtterance = utterance;
-        this.setState({ speakingHotspotId: hotspotId });
-        this.speechSynthesis.speak(utterance);
+        }
     };
 
     stopSpeaking = () => {
@@ -949,7 +1053,7 @@ class VirtualTourApp extends Component {
             document.addEventListener('mouseup', this.handleDocumentMouseUp);
         }
 
-
+        this.fetchProjectInfo();
     }
 
     componentDidUpdate(prevProps) {
@@ -968,6 +1072,8 @@ class VirtualTourApp extends Component {
     }
 
     fetchProjectInfo = async () => {
+        if (this.state.isViewMode) return;
+
         const stragingId = this.props.projectData?.project?._id || this.props.projectData?._id;
         if (!stragingId) {
             console.log("No stragingId found in projectData:", this.props.projectData);
@@ -1063,7 +1169,7 @@ class VirtualTourApp extends Component {
                         const pitch = 90 - (infoEntry.y / 100) * 180;
                         const yaw = (infoEntry.x / 100) * 360 - 180;
 
-                        newHotspots.push({
+                        const infoHotspot = {
                             id: infoEntry._id || `area_info_${sceneId}_${index}`,
                             pitch: pitch,
                             yaw: yaw,
@@ -1071,7 +1177,10 @@ class VirtualTourApp extends Component {
                             title: 'Info',
                             description: infoEntry.description,
                             areaId: area._id
-                        });
+                        };
+
+                        console.log('Creating info hotspot:', infoHotspot);
+                        newHotspots.push(infoHotspot);
                     }
                 });
 
@@ -1160,6 +1269,8 @@ class VirtualTourApp extends Component {
                     }
                 });
 
+                // At this point, newHotspots contains both info and navigation hotspots for this area.
+                // Assign them to the scene.
                 updatedScenes[sceneId].hotspots = newHotspots;
             }
         });
@@ -2490,11 +2601,10 @@ class VirtualTourApp extends Component {
                 });
             }
         } else {
-            // It's an information hotspot
+            // It's an information hotspot (shouldn't reach here with new click handler)
             if (this.state.ttsEnabled && hotspot.description) {
                 this.speakText(hotspot.description, hotspot.id);
             }
-            console.log("Info hotspot clicked:", hotspot.description);
         }
     };
 
@@ -2911,7 +3021,79 @@ class VirtualTourApp extends Component {
         }
     };
 
+    // Handle clicks on the panorama container (for hotspot navigation)
+    handleContainerClick = (event) => {
+        const containerRect = this.containerRef.current.getBoundingClientRect();
+        const x = event.clientX - containerRect.left;
+        const y = event.clientY - containerRect.top;
+
+        const { currentScene, scenes, hotspotPlacementActive, infoHotspotPlacementActive } = this.state;
+        const activeScene = scenes[currentScene];
+
+        // If in placement mode, handle placement
+        if (hotspotPlacementActive || infoHotspotPlacementActive) {
+            const viewer = this.viewerRef.current?.getViewer?.();
+            if (!viewer) return;
+
+            const pitch = viewer.mouseEventToCoords(event)[0];
+            const yaw = viewer.mouseEventToCoords(event)[1];
+
+            if (infoHotspotPlacementActive) {
+                this.setState({
+                    pendingInfoHotspotPos: { pitch, yaw },
+                    showInfoHotspotDialog: true,
+                    infoHotspotPlacementActive: false
+                });
+            } else {
+                this.setState({
+                    pendingHotspotPos: { pitch, yaw },
+                    showLocationDialog: true,
+                    hotspotPlacementActive: false
+                });
+            }
+            return;
+        }
+
+        // Check if clicking on a hotspot
+        const allHotspots = [...(activeScene?.hotspots || []), ...this.state.globalHotspots];
+        const viewerData = this.latestViewerData || {
+            yaw: this.state.viewerYaw,
+            pitch: this.state.viewerPitch,
+            hfov: this.state.viewerHfov
+        };
+
+        for (const hotspot of allHotspots) {
+            const projected = this.projectToScreen(
+                hotspot.yaw,
+                hotspot.pitch,
+                viewerData.yaw,
+                viewerData.pitch,
+                viewerData.hfov || 100,
+                containerRect.width,
+                containerRect.height
+            );
+
+            if (projected) {
+                const distance = Math.sqrt(Math.pow(x - projected.x, 2) + Math.pow(y - projected.y, 2));
+                const clickRadius = 25; // Same as hover radius
+
+                if (distance < clickRadius) {
+                    // Hotspot clicked!
+                    if (hotspot.type === 'navigation') {
+                        this.showHotspot(hotspot);
+                    } else if (hotspot.type === 'info') {
+                        // Info hotspots are handled by hover/TTS, just log for debugging
+                        console.log('Info hotspot clicked - Full object:', JSON.stringify(hotspot, null, 2));
+                        console.log('Info hotspot description:', hotspot.description);
+                    }
+                    return;
+                }
+            }
+        }
+    };
+
     handleViewerMouseDown = (event) => {
+        if (this.state.isViewMode) return;
         const containerRect = this.containerRef.current.getBoundingClientRect();
         const x = event.clientX - containerRect.left;
         const y = event.clientY - containerRect.top;
@@ -3282,6 +3464,7 @@ class VirtualTourApp extends Component {
 
     handleViewerDrop = (e) => {
         e.preventDefault();
+        if (this.state.isViewMode) return;
         const data = e.dataTransfer.getData("application/json");
         this.setState({ activeDropItem: null, dropZonePosition: null });
 
@@ -3308,6 +3491,44 @@ class VirtualTourApp extends Component {
             showHotspotOverlay: false,
             selectedHotspot: null,
         });
+    };
+
+
+    // Handle Share Button Click
+    handleShare = async () => {
+        const stragingId = this.props.projectData?._id || this.props.projectData?.id || this.props.projectData?.project?._id;
+        if (!stragingId) {
+            alert("Cannot share: Project ID not found.");
+            return;
+        }
+
+        const shareUrl = `${window.location.origin}?share=${stragingId}`;
+        const shareData = {
+            title: this.state.projectInfoTitle || 'Virtual Tour',
+            text: 'Check out this 360° virtual tour!',
+            url: shareUrl
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+                console.log('Content shared successfully');
+            } catch (err) {
+                console.error('Error sharing:', err);
+            }
+        } else {
+            // Fallback to clipboard
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(shareUrl).then(() => {
+                    alert("Share link copied to clipboard!\n" + shareUrl);
+                }).catch(err => {
+                    console.error('Could not copy text: ', err);
+                    prompt("Copy this link to share:", shareUrl);
+                });
+            } else {
+                prompt("Copy this link to share:", shareUrl);
+            }
+        }
     };
 
     render() {
@@ -3429,6 +3650,7 @@ class VirtualTourApp extends Component {
                     ref={this.containerRef}
                     onDragOver={this.handleViewerDragOver}
                     onDrop={this.handleViewerDrop}
+                    onClick={this.handleContainerClick}
                 >
                     <Pannellum
                         ref={this.viewerRef}

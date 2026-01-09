@@ -6,7 +6,8 @@
     "prebuild": "npm install --legacy-peer-deps",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 react-scripts build",
     "clean": "rimraf build",
-    "start": "cross-env NODE_OPTIONS=--max-old-space-size=4096 react-scripts start",
+    "start": "serve -s build",
+    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 react-scripts start",
     "test": "react-scripts test",
     "deploy": "gh-pages -d build"
   },
@@ -15,6 +16,7 @@
     "cross-env": "^7.0.3",
     "fabric": "^6.9.0",
     "react-scripts": "^5.0.1",
+    "serve": "^14.2.5",
     "video.js": "7.18.1",
     "websocket-driver": "^0.7.4"
   },

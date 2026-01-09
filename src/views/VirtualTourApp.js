@@ -899,16 +899,15 @@ class VirtualTourApp extends Component {
         const viewData = urlParams.get('view');
 
         if (tourId) {
-            // Load specific tour by ID
+            // First try to load from local storage (legacy/preview)
             const loaded = this.loadTourById(tourId);
+
             if (loaded) {
                 this.setState({ isViewMode: true, currentTourId: tourId });
-
-                // 🔹 Remove auto-refresh to prevent duplicate API calls
-                // Only refresh when explicitly needed, not automatically
-                // this.refreshInterval = setInterval(() => {
-                //     this.loadTourById(tourId);
-                // }, 5000);
+            } else {
+                // If not found locally, try fetching from public API
+                console.log("Tour not found locally, fetching from public API:", tourId);
+                this.fetchPublicTour(tourId);
             }
         } else if (viewData === 'latest') {
             // In view mode, always load the latest data from localStorage
@@ -950,7 +949,7 @@ class VirtualTourApp extends Component {
             document.addEventListener('mouseup', this.handleDocumentMouseUp);
         }
 
-        this.fetchProjectInfo();
+
     }
 
     componentDidUpdate(prevProps) {
@@ -1550,37 +1549,59 @@ class VirtualTourApp extends Component {
         }
     };
 
+    // Fetch public tour data
+    fetchPublicTour = async (tourId) => {
+        this.setState({ isLoading: true, loadingMessage: "Loading tour..." });
+        try {
+            // Try fetching with the tourId (which might be a project ID)
+            const response = await stragingService.getPublicStragingById(tourId);
+            console.log("Public tour fetched:", response);
+
+            if (response && response.data) {
+                const projectData = response.data;
+                // Use the sync logic to populate scenes/areas/hotspots
+                this.syncScenesWithAreas(projectData);
+                this.setState({
+                    isViewMode: true,
+                    currentTourId: tourId,
+                    // Determine initial scene (prefer first area or project default)
+                    currentScene: projectData.areas?.[0]?._id || Object.keys(this.state.scenes)[0]
+                });
+            }
+        } catch (error) {
+            console.error("Error fetching public tour:", error);
+            alert("Failed to load tour. It may be invalid or private.");
+        } finally {
+            this.setState({ isLoading: false });
+        }
+    };
+
     // Handle share button
     handleShare = async () => {
-        // Save current data to localStorage first
-        this.saveTourToLocalStorage();
+        // Use the backend Project ID if available (for global sharing)
+        const projectId = this.props.projectData?._id || this.props.projectData?.project?._id;
 
-        // Generate a unique ID for this tour
-        const tourId = this.generateTourId();
+        // If no backend ID, fall back to local generation (only works on same device)
+        const tourId = projectId || this.generateTourId();
 
-        // Store tour data
-        const tourData = {
-            id: tourId,
-            currentScene: this.state.currentScene,
-            scenes: this.state.scenes,
-            areas: this.state.areas,
-            globalHotspots: this.state.globalHotspots,
-            globalPngOverlays: this.state.globalPngOverlays,
-            timestamp: Date.now()
-        };
+        // If local ID, save to localStorage (legacy behavior)
+        if (!projectId) {
+            this.saveTourToLocalStorage();
+            const tourData = {
+                id: tourId,
+                currentScene: this.state.currentScene,
+                scenes: this.state.scenes,
+                areas: this.state.areas,
+                globalHotspots: this.state.globalHotspots,
+                globalPngOverlays: this.state.globalPngOverlays,
+                timestamp: Date.now()
+            };
+            sessionStorage.setItem(`tour_${tourId}`, JSON.stringify(tourData));
+            localStorage.setItem(`tour_${tourId}`, JSON.stringify(tourData));
+        }
 
-        // Store in multiple places for maximum compatibility
-        sessionStorage.setItem(`tour_${tourId}`, JSON.stringify(tourData));
-        localStorage.setItem(`tour_${tourId}`, JSON.stringify(tourData));
-
-        // Also store with a fixed key for easy updates
-        localStorage.setItem('sharedTourData', JSON.stringify(tourData));
-
-        // Create shareable URL with tour ID
+        // Create shareable URL
         const shareableLink = `${window.location.origin}${window.location.pathname}?tour=${tourId}`;
-
-        // Store the tour ID for updates
-        this.setState({ currentTourId: tourId });
 
         if (navigator.share) {
             try {

@@ -11,6 +11,12 @@ export const stragingService = {
     return response.data;
   },
 
+  // Public - Get specific straging by ID
+  getPublicStragingById: async (stragingId) => {
+    const response = await axios.get(`${API_BASE}/straging/public/${stragingId}`);
+    return response.data;
+  },
+
   // User - Create straging
   uploadStraging: async (formData, token) => {
     const response = await axios.post(`${API_BASE}/straging`, formData, {

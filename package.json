@@ -4,14 +4,15 @@
   "description": "Pannellum React Component",
   "scripts": {
     "prebuild": "npm install --legacy-peer-deps",
-    "build": "react-scripts build",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 react-scripts build",
     "clean": "rimraf build",
-    "start": "react-scripts start",
+    "start": "cross-env NODE_OPTIONS=--max-old-space-size=4096 react-scripts start",
     "test": "react-scripts test",
     "deploy": "gh-pages -d build"
   },
   "dependencies": {
     "axios": "^1.13.2",
+    "cross-env": "^7.0.3",
     "fabric": "^6.9.0",
     "react-scripts": "^5.0.1",
     "video.js": "7.18.1",

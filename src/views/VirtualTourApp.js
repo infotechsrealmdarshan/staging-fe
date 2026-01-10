@@ -415,6 +415,10 @@ class VirtualTourApp extends Component {
         // Preload reloader icon for canvas
         this.reloaderImage = new Image();
         this.reloaderImage.src = reloaderIconPath;
+
+        // 🔹 API Call Guards
+        this.isFetchingProjectInfo = false;
+        this.lastProjectInfoFetchTime = 0;
     }
 
     // 🔹 Start tracking viewer rotation and render loop
@@ -1080,6 +1084,22 @@ class VirtualTourApp extends Component {
             return;
         }
 
+        // 🔹 Prevention of duplicate/spam API calls
+        if (this.isFetchingProjectInfo) {
+            console.log("Project info fetch already in progress - skipping");
+            return;
+        }
+
+        // Throttle: Allow only one call every 1 second
+        const now = Date.now();
+        if (now - this.lastProjectInfoFetchTime < 1000) {
+            console.log("Throttling project info fetch - skipping");
+            return;
+        }
+
+        this.isFetchingProjectInfo = true;
+        this.lastProjectInfoFetchTime = now;
+
         this.setState({ isLoading: true, loadingMessage: "Updating project data..." });
 
         console.log("Fetching project info for stragingId:", stragingId);
@@ -1105,6 +1125,7 @@ class VirtualTourApp extends Component {
             console.error("Error fetching project info:", error);
         } finally {
             this.setState({ isLoading: false });
+            this.isFetchingProjectInfo = false;
         }
     };
 
@@ -1957,6 +1978,7 @@ class VirtualTourApp extends Component {
         this.setState({
             showLocationDialog: false,
             hotspotPlacementActive: false,
+            infoHotspotPlacementActive: false,
             hotspotName: "",
             pendingHotspotPos: null,
             uploadedImage: null,
@@ -2096,6 +2118,7 @@ class VirtualTourApp extends Component {
                 title: finalAreaName,
                 image: uploadedImage || (targetSceneId ? updatedScenes[targetSceneId].image : null),
                 targetScene: targetSceneId,
+                type: "navigation",
                 locked: true
             };
 
@@ -2170,7 +2193,7 @@ class VirtualTourApp extends Component {
                         if (hsResponse && (hsResponse.success || hsResponse.status === 1 || hsResponse.statusCode === 200)) {
                             console.log("✓ Hotspot saved successfully - triggering project info refresh");
                             // 🔹 Trigger refresh to sync with backend
-                            await this.fetchProjectInfo();
+                            // await this.fetchProjectInfo();
                         } else {
                             console.log("⚠️ API response indicates failure or unexpected format:", hsResponse);
                         }
@@ -3633,7 +3656,7 @@ class VirtualTourApp extends Component {
                 {/* Direct Placement Hint (Overlay on top of Panorama) */}
                 {
                     (hotspotPlacementActive || infoHotspotPlacementActive) && (
-                        <div className="placement-hint-overlay fade-in">
+                        <div className="placement-hint-overlay centered-fade-in">
                             <div className="placement-hint-card">
                                 <span className="placement-hint-text">
                                     {infoHotspotPlacementActive ? "Click anywhere to place info hotspot" : "Click anywhere to place your hotspot"}
@@ -3788,7 +3811,7 @@ class VirtualTourApp extends Component {
                 {
                     showSelectAreaSlider && (
                         <div className="slider-overlay" onClick={this.closeSelectAreaSlider}>
-                            <div className="select-area-slider slide-up" onClick={(e) => e.stopPropagation()}>
+                            <div className="select-area-slider slider-slide-up" onClick={(e) => e.stopPropagation()}>
                                 <h3 className="slider-header">Select Area</h3>
 
                                 <div className="area-list">
@@ -3911,7 +3934,7 @@ class VirtualTourApp extends Component {
                                     <button
                                         className="dialog-button save-dialog-button"
                                         onClick={this.saveLocationDialog}
-                                        disabled={(!selectedLocation && !this.state.hotspotName.trim()) && !uploadedImage}
+                                        disabled={((!selectedLocation && !this.state.hotspotName.trim()) && !uploadedImage) || this.state.isLoading}
                                     >
                                         Save
                                     </button>
@@ -4066,7 +4089,7 @@ class VirtualTourApp extends Component {
                                     <button
                                         className="dialog-button save-dialog-button"
                                         onClick={this.saveNewItem}
-                                        disabled={!newItemImage}
+                                        disabled={!newItemImage || this.state.isLoading}
                                     >
                                         Save
                                     </button>
@@ -4145,7 +4168,7 @@ class VirtualTourApp extends Component {
                                     <button
                                         className="dialog-button save-dialog-button"
                                         onClick={this.saveNewArea}
-                                        disabled={!newAreaName.trim()}
+                                        disabled={!newAreaName.trim() || this.state.isLoading}
                                     >
                                         Save
                                     </button>
@@ -4191,7 +4214,7 @@ class VirtualTourApp extends Component {
                                     <button
                                         className="dialog-button save-dialog-button"
                                         onClick={this.saveProjectInfo}
-                                        disabled={!this.state.projectInfoDescription.trim()}
+                                        disabled={!this.state.projectInfoDescription.trim() || this.state.isLoading}
                                     >
                                         Update Info
                                     </button>
@@ -4228,7 +4251,7 @@ class VirtualTourApp extends Component {
                                     <button
                                         className="dialog-button save-dialog-button"
                                         onClick={this.saveInfoHotspot}
-                                        disabled={!this.state.infoHotspotDescription.trim()}
+                                        disabled={!this.state.infoHotspotDescription.trim() || this.state.isLoading}
                                     >
                                         Save
                                     </button>
